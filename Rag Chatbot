@@ -1,0 +1,351 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "gpuType": "T4",
+      "authorship_tag": "ABX9TyPcTYWt1oMUoKJvd0OFXaZF",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    },
+    "accelerator": "GPU"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/ghanianila1-eng/rag-chatbot-cohere-groq/blob/main/Rag%20Chatbot\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "t6BMyCOnAvvj",
+        "outputId": "bd0e77ff-1a51-49fb-c722-75beafaccb4d"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m2.5/2.5 MB\u001b[0m \u001b[31m47.7 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m31.4/31.4 MB\u001b[0m \u001b[31m71.5 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m295.3/295.3 kB\u001b[0m \u001b[31m26.4 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m134.9/134.9 kB\u001b[0m \u001b[31m14.0 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m3.5/3.5 MB\u001b[0m \u001b[31m113.0 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m64.7/64.7 kB\u001b[0m \u001b[31m6.3 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m50.9/50.9 kB\u001b[0m \u001b[31m4.9 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\n",
+            "google-colab 1.0.0 requires requests==2.32.4, but you have requests 2.32.5 which is incompatible.\u001b[0m\u001b[31m\n",
+            "\u001b[0m"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install langchain langchain-community faiss-cpu cohere groq gradio -q\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import os\n",
+        "\n",
+        "os.environ[\"COHERE_API_KEY\"] = \"Paste_Cohere_api\"\n",
+        "os.environ[\"GROQ_API_KEY\"] = \"Past_Groq_api\"\n"
+      ],
+      "metadata": {
+        "id": "UMgCLcHHoh3W"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import bs4\n",
+        "from langchain_community.document_loaders import WebBaseLoader\n",
+        "from langchain_text_splitters import RecursiveCharacterTextSplitter\n",
+        "\n",
+        "# Load Lilian Weng's blog (AI agents)\n",
+        "loader = WebBaseLoader(\n",
+        "    web_paths=(\"https://lilianweng.github.io/posts/2023-06-23-agent/\",),\n",
+        "    bs_kwargs=dict(parse_only=bs4.SoupStrainer(class_=(\"post-content\", \"post-title\")))\n",
+        ")\n",
+        "docs = loader.load()\n",
+        "\n",
+        "# Split into chunks\n",
+        "splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)\n",
+        "chunks = splitter.split_documents(docs)\n",
+        "print(f\"Loaded {len(chunks)} chunks\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "CeLdZky3HRuF",
+        "outputId": "e3c2c063-42d0-4f76-f893-1c9eed95d042"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "WARNING:langchain_community.utils.user_agent:USER_AGENT environment variable not set, consider setting it to identify your requests.\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Loaded 63 chunks\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!pip install langchain-cohere -q\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "KJepLa_tLavh",
+        "outputId": "a8489e1c-4192-40e1-9059-488b42c6edd3"
+      },
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/42.3 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m42.3/42.3 kB\u001b[0m \u001b[31m2.8 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from langchain_cohere import CohereEmbeddings\n",
+        "from langchain_community.vectorstores import FAISS\n",
+        "\n",
+        "embeddings = CohereEmbeddings(model=\"embed-english-v3.0\")\n",
+        "vector_store = FAISS.from_documents(chunks, embeddings)\n"
+      ],
+      "metadata": {
+        "id": "Bts23EZ6HSwx"
+      },
+      "execution_count": 6,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from groq import Groq\n",
+        "\n",
+        "groq_client = Groq(api_key=os.environ[\"GROQ_API_KEY\"])\n"
+      ],
+      "metadata": {
+        "id": "zWRGQ3X-Iym7"
+      },
+      "execution_count": 7,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def rag_chat(query, history=[]):\n",
+        "    try:\n",
+        "        # 1. Retrieve relevant docs\n",
+        "        results = vector_store.similarity_search(query, k=3)\n",
+        "        context = \"\\n\\n\".join([r.page_content for r in results]) if results else \"No relevant context found.\"\n",
+        "\n",
+        "        # 2. Ask Groq\n",
+        "        resp = groq_client.chat.completions.create(\n",
+        "            model=\"llama-3.1-8b-instant\",\n",
+        "            messages=[\n",
+        "                {\"role\": \"system\", \"content\": \"You are a helpful assistant. Use the given context.\"},\n",
+        "                {\"role\": \"user\", \"content\": f\"Question: {query}\\n\\nContext:\\n{context}\"}\n",
+        "            ],\n",
+        "        )\n",
+        "        return resp.choices[0].message.content\n",
+        "\n",
+        "    except Exception as e:\n",
+        "        return f\"⚠️ Error: {str(e)}\"\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "ADlVLOTsMHvu"
+      },
+      "execution_count": 13,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(rag_chat(\"What is Task Decomposition in AI agents?\"))\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "aor4kiKnMIqj",
+        "outputId": "bd4821e0-b3ab-4e4e-be1d-78e8913cce4a"
+      },
+      "execution_count": 11,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "I'd be happy to explain Task Decomposition in AI agents and walk you through a hypothetical process.\n",
+            "\n",
+            "**Task Decomposition in AI Agents:**\n",
+            "\n",
+            "Task Decomposition is a process used by AI agents to break down complex tasks into manageable, smaller tasks. This approach helps the agent plan and execute tasks efficiently by simplifying the problem and reducing computational requirements.\n",
+            "\n",
+            "**Hypothetical Task Decomposition Process:**\n",
+            "\n",
+            "Let's say the user inputs the following prompt:\n",
+            "\n",
+            " User Input: Write a short story about a character who discovers a hidden treasure on a deserted island.\n",
+            "\n",
+            "The task decomposition process would involve the following steps:\n",
+            "\n",
+            "**Component One: Planning and Task Decomposition**\n",
+            "\n",
+            "* The AI agent would first decompose the task into smaller subtasks, such as:\n",
+            "\t+ Defining the character and their backstory\n",
+            "\t+ Creating a descriptive setting for the deserted island\n",
+            "\t+ Establishing a plot for the character's journey to find the treasure\n",
+            "* These subtasks would be broken down further into specific tasks, such as:\n",
+            "\t+ Writing a character profile\n",
+            "\t+ Describing the island's geography and climate\n",
+            "\t+ Developing a treasure hunt scenario\n",
+            "\n",
+            "**Task Execution:**\n",
+            "\n",
+            "* An expert model would be selected to execute the subtasks and log results.\n",
+            "* For example, the expert model for writing a character profile might generate a few paragraphs about the character's background, personality, and motivations.\n",
+            "\n",
+            "Here's a hypothetical output from a Chain of Thought-based expert model:\n",
+            "\n",
+            "1. Define the character's name: \"Alex\"\n",
+            "2. Establish the character's age: 25\n",
+            "3. Specify the character's profession: Archaeologist\n",
+            "4. Describe the character's personality: Curious and adventurous\n",
+            "5. Develop the character's backstory: Alex grew up in a family of treasure hunters and always felt the thrill of adventure\n",
+            "\n",
+            "Similarly, the expert model for describing the island's geography and climate might generate a few paragraphs about the island's unique features.\n",
+            "\n",
+            "**Model Inference Results:**\n",
+            "\n",
+            "Here's an example of the model inference results for the character development task:\n",
+            "\n",
+            "* **File Path:** /home/user/model_outputs/task_decomposition/character_profile.txt\n",
+            "* **Task Output:** \"Alex is a 25-year-old archaeologist who grew up in a family of treasure hunters. She's curious and adventurous, and her background has instilled in her a sense of wanderlust. Alex has a passion for uncovering hidden secrets and pushing boundaries.\"\n",
+            "\n",
+            "These results would be analyzed and evaluated by the user to determine their relevance and usefulness for the task at hand.\n",
+            "\n",
+            "**Complete File Path:**\n",
+            "\n",
+            "Note that the complete file paths would depend on the specific file system and location of the model outputs. If inference results contain a file path, I would provide the complete file path to the user.\n",
+            "\n",
+            "Please let me know if you have any questions or need further clarification on Task Decomposition and the hypothetical process!\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import gradio as gr\n",
+        "\n",
+        "demo = gr.ChatInterface(\n",
+        "    fn=rag_chat,\n",
+        "    title=\"🤖 RAG Chatbot (Cohere + Groq)\",\n",
+        "    description=\"Ask me questions based on Lilian Weng's AI Agents blog.\"\n",
+        ")\n",
+        "\n",
+        "demo.launch(share=True)\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 645
+        },
+        "id": "sxx14AxCMOOG",
+        "outputId": "111a859d-d980-430b-b035-80f80eee3826"
+      },
+      "execution_count": 14,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.12/dist-packages/gradio/chat_interface.py:345: UserWarning: The 'tuples' format for chatbot messages is deprecated and will be removed in a future version of Gradio. Please set type='messages' instead, which uses openai-style 'role' and 'content' keys.\n",
+            "  self.chatbot = Chatbot(\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Colab notebook detected. To show errors in colab notebook, set debug=True in launch()\n",
+            "* Running on public URL: https://47ef2ca1a5d6245dba.gradio.live\n",
+            "\n",
+            "This share link expires in 1 week. For free permanent hosting and GPU upgrades, run `gradio deploy` from the terminal in the working directory to deploy to Hugging Face Spaces (https://huggingface.co/spaces)\n"
+          ]
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "<IPython.core.display.HTML object>"
+            ],
+            "text/html": [
+              "<div><iframe src=\"https://47ef2ca1a5d6245dba.gradio.live\" width=\"100%\" height=\"500\" allow=\"autoplay; camera; microphone; clipboard-read; clipboard-write;\" frameborder=\"0\" allowfullscreen></iframe></div>"
+            ]
+          },
+          "metadata": {}
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": []
+          },
+          "metadata": {},
+          "execution_count": 14
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "metadata": {
+        "id": "ZTrKKrEJOL_B"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
